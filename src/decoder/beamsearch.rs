@@ -6,7 +6,7 @@ use crate::lm::{LMStateRef, LM};
 #[derive(Debug, PartialEq)]
 struct DecoderState<T> {
     score: f32,
-    token: i32,
+    token: &str,
     prev_blank: bool,
     am_score: f32,
     lm_score: f32,
@@ -39,6 +39,8 @@ impl<T> DecoderState<T> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct BeamSearchDecoderOptions {
+    pub bpe_token: Vec<u8>,
+    pub is_bpe: bool,
     pub beam_size: usize,
     pub beam_size_token: usize,
     /// the decoder will ignore paths whose score is more than this value lower than the best score.
@@ -104,7 +106,7 @@ impl<T: LM> BeamSearchDecoder<T> {
         });
     }
 
-    fn decode_step(&mut self, data: &[f32], steps: usize, n_vocab: usize, blank_id: i32) {
+    fn decode_step(&mut self, data: &[f32], steps: usize, n_vocab: usize, blank_id: i32) { #logits, seq_len, vocab_size, blank
         // Reserve hypothesis buffer.
         while self.hypothesis.len() < steps + 2 {
             self.hypothesis
@@ -112,6 +114,7 @@ impl<T: LM> BeamSearchDecoder<T> {
         }
 
         // Loop over time steps.
+        is_infix_bpe = false
         let mut target_index = (0..n_vocab).collect::<Vec<_>>();
         for t in 0..steps {
             if n_vocab > self.options.beam_size_token {
@@ -135,6 +138,7 @@ impl<T: LM> BeamSearchDecoder<T> {
                             let token = target as i32;
                             let am_score = data[t * n_vocab + target];
                             let score = prev_hyp.score + am_score;
+                            let whole_unit_bpe = false as bool; # BPE units could be like ▁⁇▁
 
                             if token != blank_id && (token != prev_token || prev_hyp.prev_blank) {
                                 // New token
@@ -149,6 +153,24 @@ impl<T: LM> BeamSearchDecoder<T> {
                                     parent_index: prev_hyp_idx as isize,
                                     lm_state,
                                 }
+                            else if self.options._is_bpe && (token[:1] == self.options.bpe_token or is_infix_bpe ) {
+                                // BPE token
+                                is_infix_bpe = false
+                                clean_token = token[1:]
+                                if token[-1:] == self.options.bpe_token {
+                                    clean_token = token[-1:];
+                                    is_infix_bpe = true
+                                }
+                                DecoderState {
+                                    score,
+                                    clean_token,
+                                    prev_blank: false,
+                                    am_score,
+                                    lm_score: prev_hyp.lm_score,
+                                    parent_index: prev_hyp_idx as isize,
+                                    lm_state: prev_lm_state.clone(),
+                                }
+                            }
                             } else if token == blank_id {
                                 // Blank
                                 DecoderState {
